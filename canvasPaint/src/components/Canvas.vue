@@ -6,9 +6,17 @@
       </el-header>
       <el-container>
         <el-aside width="200px">
-          <el-button type="primary" size="default" @click="clearCanvas">清除</el-button>
-          <el-button type="primary" size="default" @click="setShape('line')">绘制直线</el-button>
-          <el-button type="primary" size="default" @click="setShape('circle')">绘制圆形</el-button>
+          <el-menu default-active="1">
+            <el-menu-item index="1">
+              <el-button type="primary" size="default" @click="clearCanvas" style="width: 100%;">清除</el-button>
+            </el-menu-item>
+            <el-menu-item index="2">
+              <el-button type="primary" size="default" @click="setShape('line')" style="width: 100%;">绘制线条</el-button>
+            </el-menu-item>
+            <el-menu-item index="3">
+              <el-button type="primary" size="default" @click="setShape('circle')" style="width: 100%;">绘制圆形</el-button>
+            </el-menu-item>
+          </el-menu>
         </el-aside>
         <el-container>
           <el-main>
@@ -26,6 +34,7 @@
   <script setup lang="ts">
   import { useUserStore } from '../store/userStore';
   import { onMounted, ref } from 'vue';
+  import { Canvg } from 'canvg';
   
   // 定义canvas和fileInput的ref
   const fileInput = ref<HTMLInputElement | null>(null);
@@ -36,6 +45,7 @@
   
   const shapeType = ref<'line' | 'circle'>('line');
   let startPoint: { x: number; y: number } | null = null;
+  let svgImage: HTMLImageElement | null = null; // 用于存储导入的SVG图像
   
   onMounted(() => {
     ctx = canvas.value.getContext('2d') as CanvasRenderingContext2D;
@@ -46,6 +56,7 @@
     if (ctx) {
       ctx.clearRect(0, 0, canvas.value!.width, canvas.value!.height);
       paths.value = [];
+      svgImage = null; // 清除导入的SVG图像
     }
   };
   
@@ -66,6 +77,11 @@
   
     // 清空当前路径
     ctx.clearRect(0, 0, canvas.value!.width, canvas.value!.height);
+  
+    // 重新绘制导入的SVG图像
+    if (svgImage) {
+      ctx.drawImage(svgImage, 0, 0);
+    }
   
     // 重新绘制所有路径
     paths.value.forEach(({ type, points }) => {
@@ -139,9 +155,9 @@
       const file = target.files[0];
       const reader = new FileReader();
   
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const svgContent = e.target?.result as string;
-        loadSVGToCanvas(svgContent);
+        await loadSVGToCanvas(svgContent);
       };
       ctx.clearRect(0, 0, canvas.value!.width, canvas.value!.height);
       paths.value = [];
@@ -151,18 +167,10 @@
   };
   
   // 加载SVG到Canvas
-  const loadSVGToCanvas = (svg: string) => {
-    const img = new Image();
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-  
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.value.width, canvas.value.height); // 清空画布
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-      extractPathsFromSVG(svg); // 解析路径并保存
-    };
-    img.src = url;
+  const loadSVGToCanvas = async (svg: string) => {
+    const v = await Canvg.from(ctx, svg);
+    await v.render();
+    extractPathsFromSVG(svg); // 解析路径并保存
   };
   
   // 解析 SVG 并提取路径
@@ -170,7 +178,8 @@
     const parser = new DOMParser();
     const doc = parser.parseFromString(svg, "image/svg+xml");
     const pathElements = doc.querySelectorAll("path");
-    
+    const circleElements = doc.querySelectorAll("circle");
+  
     pathElements.forEach(path => {
       const d = path.getAttribute("d");
       if (d) {
@@ -178,7 +187,17 @@
         paths.value.push({ type: 'line', points }); // 将路径点包装成符合 paths 数组类型的对象
       }
     });
-  }
+  
+    circleElements.forEach(circle => {
+      const cx = parseFloat(circle.getAttribute("cx") || "0");
+      const cy = parseFloat(circle.getAttribute("cy") || "0");
+      const r = parseFloat(circle.getAttribute("r") || "0");
+      paths.value.push({
+        type: 'circle',
+        points: [{ x: cx - r, y: cy }, { x: cx + r, y: cy }],
+      });
+    });
+  };
   
   // 解析路径数据（简单示例）
   const parsePathData = (d: string) => {
