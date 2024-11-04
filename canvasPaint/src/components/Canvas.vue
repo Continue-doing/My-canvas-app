@@ -223,6 +223,51 @@ const loadSVGToCanvas = async (svg: string) => {
   const v = await Canvg.from(ctx, svg);
   await v.render();
   extractPathsFromSVG(svg); // 解析路径并保存
+
+  // 获取SVG的宽度和高度
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svg, "image/svg+xml");
+  const svgElement = doc.querySelector("svg");
+  const svgWidth = parseFloat(svgElement?.getAttribute("width") || "0");
+  const svgHeight = parseFloat(svgElement?.getAttribute("height") || "0");
+
+  // 计算缩放比例
+  const scaleX = canvas.value!.width / svgWidth;
+  const scaleY = canvas.value!.height / svgHeight;
+
+  // 清空画布并重新绘制网格
+  ctx.clearRect(0, 0, canvas.value!.width, canvas.value!.height);
+  drawGrid();
+
+  // 重新绘制SVG路径，并进行坐标转换
+  paths.value.forEach(({ type, points, color }) => {
+    ctx.strokeStyle = color;
+    if (type === 'line') {
+      ctx.beginPath();
+      points.forEach(({ x, y }, index) => {
+        if (index === 0) {
+          ctx.moveTo(x * scaleX, y * scaleY);
+        } else {
+          ctx.lineTo(x * scaleX, y * scaleY);
+        }
+      });
+      ctx.stroke();
+    } else if (type === 'circle') {
+      const [start, end] = points;
+      const radius = Math.sqrt(
+        Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
+      );
+      ctx.beginPath();
+      ctx.arc(start.x * scaleX, start.y * scaleY, radius * scaleX, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (type === 'brush') {
+      ctx.beginPath();
+      points.forEach(({ x, y }) => {
+        ctx.lineTo(x * scaleX, y * scaleY);
+      });
+      ctx.stroke();
+    }
+  });
 };
 
 // 解析 SVG 并提取路径
