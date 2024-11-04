@@ -1,14 +1,18 @@
 <template>
   <el-container>
     <el-header>
-      <el-button type="primary" size="default" @click="selectFiles">选择文件</el-button>
-      <el-button type="primary" size="default" @click="saveCanvas">保存并导出文件</el-button>
-      <el-button type="primary" size="default" @click="undo">撤销</el-button>
-      <el-button type="primary" size="default" @click="toggleGrid">切换网格</el-button>
+      <div class="header-left">
+        <el-button type="primary" size="default" @click="selectFiles">选择文件</el-button>
+      </div>
+      <div class="header-center">
+        <el-button type="primary" size="default" @click="saveCanvas">保存并导出文件</el-button>
+        <el-button type="primary" size="default" @click="undo">撤销</el-button>
+        <el-button type="primary" size="default" @click="toggleGrid">切换网格</el-button>
+      </div>
       <el-color-picker v-model="selectedColor" @change="handleColorChange"></el-color-picker>
     </el-header>
     <el-container>
-      <el-aside width="200px">
+      <el-aside class="floating-aside">
         <el-menu default-active="1">
           <el-menu-item index="1">
             <el-button type="primary" size="default" @click="clearCanvas" style="width: 100%;">清除</el-button>
@@ -32,7 +36,6 @@
             </canvas>
           </div>
         </el-main>
-        <el-footer>Footer</el-footer>
       </el-container>
     </el-container>
     <input type="file" ref="fileInput" @change="handleFileChange" accept=".svg" style="display: none;" />
@@ -473,19 +476,54 @@ userStore.setUsername('admin');
   height: 100%;
 }
 
-.el-header,
-.el-footer {
-  background-color: #b3c0d1;
+.el-header {
   color: var(--el-text-color-primary);
   text-align: center;
   line-height: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
 }
 
-.el-aside {
+.header-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  height: 100%;
+  background-color: #d3dce6;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  gap: 10px;
+  background-color: #d3dce6;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 0 20px;
+  width: 100%;
+  height: 100%;
+}
+
+.floating-aside {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 150px;
   background-color: #d3dce6;
   color: var(--el-text-color-primary);
   text-align: center;
   line-height: 200px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
 }
 
 .el-main {

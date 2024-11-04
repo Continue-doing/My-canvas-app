@@ -1,14 +1,18 @@
 <template>
   <el-container>
     <el-header>
-      <el-button type="primary" size="default" @click="selectFiles">选择文件</el-button>
-      <el-button type="primary" size="default" @click="saveCanvas">保存并导出文件</el-button>
-      <el-button type="primary" size="default" @click="undo">撤销</el-button>
-      <el-button type="primary" size="default" @click="toggleGrid">切换网格</el-button>
+      <div class="header-left">
+        <el-button type="primary" size="default" @click="selectFiles">选择文件</el-button>
+      </div>
+      <div class="header-center">
+        <el-button type="primary" size="default" @click="undo">撤销</el-button>
+        <el-button type="primary" size="default" @click="toggleGrid">切换网格</el-button>
+        <el-button type="primary" size="default" @click="saveCanvas">保存并导出文件</el-button>
+      </div>
       <el-color-picker v-model="selectedColor" @change="handleColorChange"></el-color-picker>
     </el-header>
     <el-container>
-      <el-aside width="200px">
+      <el-aside class="floating-aside">
         <el-menu default-active="1">
           <el-menu-item index="1">
             <el-button type="primary" size="default" @click="clearCanvas" style="width: 100%;">清除</el-button>
@@ -20,7 +24,13 @@
             <el-button type="primary" size="default" @click="setShape('circle')" style="width: 100%;">绘制圆形</el-button>
           </el-menu-item>
           <el-menu-item index="4">
-            <el-button type="primary" size="default" @click="setShape('brush')" style="width: 100%;">画笔</el-button>
+            <el-button type="primary" size="default" @click="setShape('rectangle')" style="width: 100%;">绘制矩形</el-button>
+          </el-menu-item>
+          <el-menu-item index="5">
+            <el-button type="primary" size="default" @click="setShape('triangle')" style="width: 100%;">绘制三角形</el-button>
+          </el-menu-item>
+          <el-menu-item index="6">
+            <el-button type="primary" size="default" @click="setShape('diamond')" style="width: 100%;">绘制菱形</el-button>
           </el-menu-item>
         </el-menu>
       </el-aside>
@@ -32,7 +42,6 @@
             </canvas>
           </div>
         </el-main>
-        <el-footer>Footer</el-footer>
       </el-container>
     </el-container>
     <input type="file" ref="fileInput" @change="handleFileChange" accept=".svg" style="display: none;" />
@@ -49,15 +58,14 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const canvasContainer = ref<HTMLDivElement | null>(null);
 const canvas = ref<any>(); // 获取画布
 let ctx: CanvasRenderingContext2D; // 获取canvas操作api的入口类型
-const paths = ref<{ type: 'line' | 'circle' | 'brush'; points: { x: number; y: number }[]; color: string }[]>([]);
+const paths = ref<{ type: 'line' | 'circle' | 'rectangle' | 'triangle' | 'diamond'; points: { x: number; y: number }[]; color: string }[]>([]);
 const drawing = ref(false);
 const history = ref<typeof paths.value[]>([]); // 历史记录栈
 
-const shapeType = ref<'line' | 'circle' | 'brush'>('line');
+const shapeType = ref<'line' | 'circle' | 'rectangle' | 'triangle' | 'diamond'>('line');
 let startPoint: { x: number; y: number } | null = null;
 let svgImage: HTMLImageElement | null = null; // 用于存储导入的SVG图像
 const selectedColor = ref('#000000'); // 默认颜色为黑色
-let currentPath: { x: number; y: number }[] = []; // 用于存储当前画笔路径的点
 
 let showGrid = ref(true); // 是否显示网格
 
@@ -78,7 +86,7 @@ const clearCanvas = () => {
 };
 
 // 设置当前形状
-const setShape = (shape: 'line' | 'circle' | 'brush') => {
+const setShape = (shape: 'line' | 'circle' | 'rectangle' | 'triangle' | 'diamond') => {
   shapeType.value = shape;
 };
 
@@ -92,7 +100,6 @@ const startDrawing = (event: MouseEvent) => {
   drawing.value = true;
   const { offsetX, offsetY } = event;
   startPoint = { x: offsetX, y: offsetY };
-  currentPath = [startPoint]; // 初始化当前画笔路径
 };
 
 const draw = (event: MouseEvent) => {
@@ -130,11 +137,30 @@ const draw = (event: MouseEvent) => {
       ctx.beginPath();
       ctx.arc(start.x, start.y, radius, 0, Math.PI * 2);
       ctx.stroke();
-    } else if (type === 'brush') {
+    } else if (type === 'rectangle') {
+      const [start, end] = points;
       ctx.beginPath();
-      points.forEach(({ x, y }) => {
-        ctx.lineTo(x, y);
-      });
+      ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+      ctx.stroke();
+    } else if (type === 'triangle') {
+      const [start, end] = points;
+      const width = end.x - start.x;
+      ctx.beginPath();
+      ctx.moveTo(start.x + width / 2, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.lineTo(start.x, end.y);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (type === 'diamond') {
+      const [start, end] = points;
+      const width = end.x - start.x;
+      const height = end.y - start.y;
+      ctx.beginPath();
+      ctx.moveTo(start.x + width / 2, start.y);
+      ctx.lineTo(end.x, start.y + height / 2);
+      ctx.lineTo(start.x + width / 2, end.y);
+      ctx.lineTo(start.x, start.y + height / 2);
+      ctx.closePath();
       ctx.stroke();
     }
   });
@@ -153,12 +179,28 @@ const draw = (event: MouseEvent) => {
     ctx.beginPath();
     ctx.arc(startPoint.x, startPoint.y, radius, 0, Math.PI * 2);
     ctx.stroke();
-  } else if (shapeType.value === 'brush' && startPoint) {
+  } else if (shapeType.value === 'rectangle' && startPoint) {
     ctx.beginPath();
-    ctx.moveTo(startPoint.x, startPoint.y);
-    ctx.lineTo(offsetX, offsetY);
+    ctx.rect(startPoint.x, startPoint.y, offsetX - startPoint.x, offsetY - startPoint.y);
     ctx.stroke();
-    currentPath.push({ x: offsetX, y: offsetY }); // 记录当前画笔路径的点
+  } else if (shapeType.value === 'triangle' && startPoint) {
+    const width = offsetX - startPoint.x;
+    ctx.beginPath();
+    ctx.moveTo(startPoint.x + width / 2, startPoint.y);
+    ctx.lineTo(offsetX, offsetY);
+    ctx.lineTo(startPoint.x, offsetY);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (shapeType.value === 'diamond' && startPoint) {
+    const width = offsetX - startPoint.x;
+    const height = offsetY - startPoint.y;
+    ctx.beginPath();
+    ctx.moveTo(startPoint.x + width / 2, startPoint.y);
+    ctx.lineTo(offsetX, startPoint.y + height / 2);
+    ctx.lineTo(startPoint.x + width / 2, offsetY);
+    ctx.lineTo(startPoint.x, startPoint.y + height / 2);
+    ctx.closePath();
+    ctx.stroke();
   }
 };
 
@@ -178,16 +220,27 @@ const stopDrawing = (event: MouseEvent) => {
         points: [startPoint, { x: offsetX, y: offsetY }],
         color: selectedColor.value,
       });
-    } else if (shapeType.value === 'brush') {
+    } else if (shapeType.value === 'rectangle') {
       paths.value.push({
-        type: 'brush',
-        points: currentPath,
+        type: 'rectangle',
+        points: [startPoint, { x: offsetX, y: offsetY }],
+        color: selectedColor.value,
+      });
+    } else if (shapeType.value === 'triangle') {
+      paths.value.push({
+        type: 'triangle',
+        points: [startPoint, { x: offsetX, y: offsetY }],
+        color: selectedColor.value,
+      });
+    } else if (shapeType.value === 'diamond') {
+      paths.value.push({
+        type: 'diamond',
+        points: [startPoint, { x: offsetX, y: offsetY }],
         color: selectedColor.value,
       });
     }
     startPoint = null;
     ctx.beginPath();
-    currentPath = []; // 清空当前画笔路径
 
     // 保存当前状态到历史记录
     history.value.push([...paths.value]);
@@ -260,11 +313,30 @@ const loadSVGToCanvas = async (svg: string) => {
       ctx.beginPath();
       ctx.arc(start.x * scaleX, start.y * scaleY, radius * scaleX, 0, Math.PI * 2);
       ctx.stroke();
-    } else if (type === 'brush') {
+    } else if (type === 'rectangle') {
+      const [start, end] = points;
       ctx.beginPath();
-      points.forEach(({ x, y }) => {
-        ctx.lineTo(x * scaleX, y * scaleY);
-      });
+      ctx.rect(start.x * scaleX, start.y * scaleY, (end.x - start.x) * scaleX, (end.y - start.y) * scaleY);
+      ctx.stroke();
+    } else if (type === 'triangle') {
+      const [start, end] = points;
+      const width = (end.x - start.x) * scaleX;
+      ctx.beginPath();
+      ctx.moveTo((start.x + width / 2) * scaleX, start.y * scaleY);
+      ctx.lineTo(end.x * scaleX, end.y * scaleY);
+      ctx.lineTo(start.x * scaleX, end.y * scaleY);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (type === 'diamond') {
+      const [start, end] = points;
+      const width = (end.x - start.x) * scaleX;
+      const height = (end.y - start.y) * scaleY;
+      ctx.beginPath();
+      ctx.moveTo((start.x + width / 2) * scaleX, start.y * scaleY);
+      ctx.lineTo(end.x * scaleX, (start.y + height / 2) * scaleY);
+      ctx.lineTo((start.x + width / 2) * scaleX, end.y * scaleY);
+      ctx.lineTo(start.x * scaleX, (start.y + height / 2) * scaleY);
+      ctx.closePath();
       ctx.stroke();
     }
   });
@@ -276,6 +348,8 @@ const extractPathsFromSVG = (svg: string) => {
   const doc = parser.parseFromString(svg, "image/svg+xml");
   const pathElements = doc.querySelectorAll("path");
   const circleElements = doc.querySelectorAll("circle");
+  const rectElements = doc.querySelectorAll("rect");
+  const polygonElements = doc.querySelectorAll("polygon");
 
   pathElements.forEach(path => {
     const d = path.getAttribute("d");
@@ -296,6 +370,41 @@ const extractPathsFromSVG = (svg: string) => {
       points: [{ x: cx - r, y: cy }, { x: cx + r, y: cy }],
       color: stroke,
     });
+  });
+
+  rectElements.forEach(rect => {
+    const x = parseFloat(rect.getAttribute("x") || "0");
+    const y = parseFloat(rect.getAttribute("y") || "0");
+    const width = parseFloat(rect.getAttribute("width") || "0");
+    const height = parseFloat(rect.getAttribute("height") || "0");
+    const stroke = rect.getAttribute("stroke") || '#000000'; // 默认颜色为黑色
+    paths.value.push({
+      type: 'rectangle',
+      points: [{ x, y }, { x: x + width, y: y + height }],
+      color: stroke,
+    });
+  });
+
+  polygonElements.forEach(polygon => {
+    const points = polygon.getAttribute("points") || '';
+    const stroke = polygon.getAttribute("stroke") || '#000000'; // 默认颜色为黑色
+    const pointsArray = points.split(' ').map(point => {
+      const [x, y] = point.split(',').map(Number);
+      return { x, y };
+    });
+    if (pointsArray.length === 3) {
+      paths.value.push({
+        type: 'triangle',
+        points: pointsArray,
+        color: stroke,
+      });
+    } else if (pointsArray.length === 4) {
+      paths.value.push({
+        type: 'diamond',
+        points: pointsArray,
+        color: stroke,
+      });
+    }
   });
 
   // 保存当前状态到历史记录
@@ -359,11 +468,30 @@ const undo = () => {
         ctx.beginPath();
         ctx.arc(start.x, start.y, radius, 0, Math.PI * 2);
         ctx.stroke();
-      } else if (type === 'brush') {
+      } else if (type === 'rectangle') {
+        const [start, end] = points;
         ctx.beginPath();
-        points.forEach(({ x, y }) => {
-          ctx.lineTo(x, y);
-        });
+        ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+        ctx.stroke();
+      } else if (type === 'triangle') {
+        const [start, end] = points;
+        const width = end.x - start.x;
+        ctx.beginPath();
+        ctx.moveTo(start.x + width / 2, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.lineTo(start.x, end.y);
+        ctx.closePath();
+        ctx.stroke();
+      } else if (type === 'diamond') {
+        const [start, end] = points;
+        const width = end.x - start.x;
+        const height = end.y - start.y;
+        ctx.beginPath();
+        ctx.moveTo(start.x + width / 2, start.y);
+        ctx.lineTo(end.x, start.y + height / 2);
+        ctx.lineTo(start.x + width / 2, end.y);
+        ctx.lineTo(start.x, start.y + height / 2);
+        ctx.closePath();
         ctx.stroke();
       }
     });
@@ -388,14 +516,18 @@ const createSVG = () => {
         Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2)
       );
       return `<circle cx="${start.x}" cy="${start.y}" r="${radius}" stroke="${color}" fill="none" stroke-width="2"/>`;
-    } else if (type === 'brush') {
-      return `<path d="${points.map((point, index) => {
-        if (index === 0) {
-          return `M ${point.x} ${point.y}`; // Move to the first point
-        } else {
-          return `L ${point.x} ${point.y}`; // Line to the next point
-        }
-      }).join(' ')}" stroke="${color}" fill="none" stroke-width="2"/>`;
+    } else if (type === 'rectangle') {
+      const [start, end] = points;
+      return `<rect x="${start.x}" y="${start.y}" width="${end.x - start.x}" height="${end.y - start.y}" stroke="${color}" fill="none" stroke-width="2"/>`;
+    } else if (type === 'triangle') {
+      const [start, end] = points;
+      const width = end.x - start.x;
+      return `<polygon points="${start.x + width / 2},${start.y} ${end.x},${end.y} ${start.x},${end.y}" stroke="${color}" fill="none" stroke-width="2"/>`;
+    } else if (type === 'diamond') {
+      const [start, end] = points;
+      const width = end.x - start.x;
+      const height = end.y - start.y;
+      return `<polygon points="${start.x + width / 2},${start.y} ${end.x},${start.y + height / 2} ${start.x + width / 2},${end.y} ${start.x},${start.y + height / 2}" stroke="${color}" fill="none" stroke-width="2"/>`;
     }
   }).join('');
 
@@ -454,11 +586,30 @@ const drawPaths = () => {
       ctx.beginPath();
       ctx.arc(start.x, start.y, radius, 0, Math.PI * 2);
       ctx.stroke();
-    } else if (type === 'brush') {
+    } else if (type === 'rectangle') {
+      const [start, end] = points;
       ctx.beginPath();
-      points.forEach(({ x, y }) => {
-        ctx.lineTo(x, y);
-      });
+      ctx.rect(start.x, start.y, end.x - start.x, end.y - start.y);
+      ctx.stroke();
+    } else if (type === 'triangle') {
+      const [start, end] = points;
+      const width = end.x - start.x;
+      ctx.beginPath();
+      ctx.moveTo(start.x + width / 2, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.lineTo(start.x, end.y);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (type === 'diamond') {
+      const [start, end] = points;
+      const width = end.x - start.x;
+      const height = end.y - start.y;
+      ctx.beginPath();
+      ctx.moveTo(start.x + width / 2, start.y);
+      ctx.lineTo(end.x, start.y + height / 2);
+      ctx.lineTo(start.x + width / 2, end.y);
+      ctx.lineTo(start.x, start.y + height / 2);
+      ctx.closePath();
       ctx.stroke();
     }
   });
@@ -473,19 +624,54 @@ userStore.setUsername('admin');
   height: 100%;
 }
 
-.el-header,
-.el-footer {
-  background-color: #b3c0d1;
+.el-header {
   color: var(--el-text-color-primary);
   text-align: center;
   line-height: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
 }
 
-.el-aside {
+.header-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 150px;
+  height: 100%;
+  background-color: #d3dce6;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  gap: 10px;
+  background-color: #d3dce6;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 0 20px;
+  width: 100%;
+  height: 100%;
+}
+
+.floating-aside {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  width: 150px;
   background-color: #d3dce6;
   color: var(--el-text-color-primary);
   text-align: center;
   line-height: 200px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
 }
 
 .el-main {
